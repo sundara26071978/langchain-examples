@@ -15,7 +15,7 @@ from langchain.agents.middleware import wrap_tool_call
 from langchain.messages import ToolMessage
 from langchain_ollama import ChatOllama
 
-from agent_dynamicmodels import get_weather
+from agents.agent_dynamicmodels import get_weather
 
 
 # Middleware for handling tool execution errors
