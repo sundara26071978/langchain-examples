@@ -33,7 +33,7 @@ class ContactInfo(BaseModel):
 
 
 # Initialize the model
-model = ChatOllama(model="qwen3.5:latest ")
+model = ChatOllama(model="qwen3.5:latest")
 
 # Create agent with structured output using ProviderStrategy
 # ProviderStrategy uses the model provider's native structured output capabilities
