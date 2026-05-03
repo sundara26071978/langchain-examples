@@ -4,14 +4,15 @@ A comprehensive, production-ready reference for building AI applications with **
 
 ## 🎯 Project Overview
 
-This repository provides practical, well-documented examples organized into four core learning modules:
+This repository provides practical, well-documented examples organized into five core learning modules:
 
-| Module | Purpose | Files |
-|--------|---------|-------|
-| **Messages** | Fundamental message types and conversation patterns | 4 examples |
-| **Model** | Core model capabilities from basic invocation to advanced features | 9 examples |
-| **Agents** | Building autonomous AI agents with reasoning and tool calling | 13 examples |
-| **Frontend** | UI/UX integration and generative UI patterns | Multiple examples |
+| Module | Purpose | Files | Difficulty |
+|--------|---------|-------|-----------|
+| **Messages** | Fundamental message types and conversation patterns | 4 examples | ⭐ Beginner |
+| **Model** | Core model capabilities from basic invocation to advanced features | 9 examples | ⭐⭐ Intermediate |
+| **Tools** | Tool creation, binding, and context-aware tool management | 6 examples | ⭐⭐⭐ Advanced |
+| **Agents** | Building autonomous AI agents with reasoning and tool calling | 13 examples | ⭐⭐⭐ Advanced |
+| **Frontend** | UI/UX integration and generative UI patterns | Multiple examples | ⭐⭐ Intermediate |
 
 ## 🚀 Quick Start
 
@@ -171,7 +172,166 @@ response = model.invoke(
 
 ---
 
-### 3. **Agents Module** - Intelligence
+### 3. **Tools Module** - Tool Creation & Management
+**Location:** `tools/`
+
+Master tool creation, binding, and context-aware tool management for AI applications.
+
+#### What You'll Learn
+- ✅ Creating tools with the `@tool` decorator
+- ✅ Type hints and automatic schema generation
+- ✅ Pydantic-based input validation
+- ✅ JSON schema for complex types
+- ✅ Tool calling and model integration
+- ✅ Accessing conversation state from tools
+- ✅ Context-aware tools with user data
+- ✅ Long-term memory with persistent storage
+- ✅ ToolRuntime for accessing runtime information
+
+#### Examples (6 total)
+1. **01_tools_with_model.py** ⭐ - Basic tool definition and binding
+2. **02_tools_with_schema_pydantic.py** ⭐⭐ - Pydantic input validation
+3. **03_tools_with_schema_json.py** ⭐⭐ - JSON schema validation
+4. **04_tools_stateaccess_toolruntiem.py** ⭐⭐⭐ - Access conversation state
+5. **05_tools_access_context.py** ⭐⭐⭐ - User context & personalization
+6. **06_tools_access_longterm_memory.py** ⭐⭐⭐ - Persistent storage across sessions
+
+#### Key Concepts
+
+**Basic Tool Definition:**
+```python
+from langchain.tools import tool
+
+@tool
+def search_database(query: str, limit: int = 10) -> str:
+    """Search the customer database.
+    
+    Args:
+        query: Search terms
+        limit: Max results (default: 10)
+    """
+    return f"Found {limit} results for '{query}'"
+
+# Bind to model
+model_with_tools = model.bind_tools([search_database])
+```
+
+**Pydantic Schema Validation:**
+```python
+from pydantic import BaseModel, Field
+from typing import Literal
+
+class WeatherInput(BaseModel):
+    location: str = Field(description="City name")
+    units: Literal["celsius", "fahrenheit"] = Field(default="celsius")
+    include_forecast: bool = Field(default=False)
+
+@tool(args_schema=WeatherInput)
+def get_weather(location: str, units: str = "celsius", include_forecast: bool = False) -> str:
+    """Get weather for a location."""
+    return f"Weather in {location}: 22°{units[0].upper()}"
+```
+
+**State-Aware Tools:**
+```python
+from langchain.tools import tool, ToolRuntime
+from langgraph.types import Command
+
+@tool
+def get_user_preference(pref_name: str, runtime: ToolRuntime) -> str:
+    """Get a user preference from conversation state."""
+    preferences = runtime.state.get("user_preferences", {})
+    return preferences.get(pref_name, "Not set")
+
+@tool
+def update_preference(key: str, value: str, runtime: ToolRuntime) -> Command:
+    """Update preference and notify model."""
+    prefs = runtime.state.get("preferences", {})
+    prefs[key] = value
+    return Command(update={"preferences": prefs})
+```
+
+**Context-Aware Tools:**
+```python
+from dataclasses import dataclass
+
+@dataclass
+class UserContext:
+    user_id: str
+
+@tool
+def get_account_info(runtime: ToolRuntime[UserContext]) -> str:
+    """Get account for current user."""
+    user_id = runtime.context.user_id
+    return f"Account info for {user_id}..."
+```
+
+**Long-Term Memory (Store):**
+```python
+from langgraph.store.memory import InMemoryStore
+
+@tool
+def save_user_data(user_id: str, data: dict, runtime: ToolRuntime) -> str:
+    """Save data to persistent store."""
+    runtime.store.put(("users",), user_id, data)
+    return "Saved"
+
+@tool
+def load_user_data(user_id: str, runtime: ToolRuntime) -> str:
+    """Load data from persistent store."""
+    user_info = runtime.store.get(("users",), user_id)
+    return str(user_info.value) if user_info else "Not found"
+```
+
+#### ToolRuntime - Accessing Execution Context
+
+The `ToolRuntime` parameter provides access to:
+- **`runtime.state`** - Short-term memory (conversation state)
+- **`runtime.context`** - Immutable config (user IDs, session info)
+- **`runtime.store`** - Long-term memory (persistent storage)
+- **`runtime.stream_writer`** - Stream real-time updates
+- **`runtime.execution_info`** - Thread/run IDs
+- **`runtime.server_info`** - Server metadata (LangGraph Server)
+
+#### Message Types in Tool Calling
+
+```
+User Input
+    ↓
+HumanMessage: "Search for customers named John"
+    ↓
+AIMessage: (with tool_calls to search_database)
+    ↓
+ToolMessage: (with search results)
+    ↓
+AIMessage: "I found 5 customers..."
+```
+
+#### Store Namespace Pattern
+
+```python
+# Save data
+store.put(("users",), "user123", user_dict)
+store.put(("conversations", "user123"), "conv_001", messages)
+
+# Retrieve data
+user_info = store.get(("users",), "user123")
+
+# List all in namespace
+all_users = store.list(("users",))
+```
+
+**Production Note:** Use `PostgresStore` for persistent storage across service restarts:
+```python
+from langgraph.store.postgres import PostgresStore
+store = PostgresStore(connection_string="postgresql://...")
+```
+
+**[Read Full Guide →](tools/README.md)**
+
+---
+
+### 4. **Agents Module** - Intelligence
 **Location:** `agents/`
 
 Build autonomous AI agents that reason, plan, and use tools.
@@ -225,7 +385,7 @@ for event in agent.stream({"input": "Your task"}):
 
 ---
 
-### 4. **Frontend Module** - User Interfaces
+### 5. **Frontend Module** - User Interfaces
 **Location:** `frontend/`
 
 Build interactive UIs for AI applications with generative UI patterns.
@@ -350,14 +510,26 @@ OLLAMA_HOST=0.0.0.0:11435 ollama serve
 ### Intermediate
 1. Explore **Model** module (examples 1-5)
 2. Learn streaming for better UX
-3. Understand tool calling
+3. Understand tool calling basics
 4. Build simple chatbots
 
-### Advanced
-1. Study **Agents** module
-2. Implement agent-based systems
-3. Combine multiple capabilities
-4. Build production applications
+### Advanced (Choose based on needs)
+
+**Path A: Tool & Agent Development**
+1. Study **Tools** module (examples 1-3)
+   - Basic tool creation with `@tool` decorator
+   - Schema validation with Pydantic
+   - JSON schema definitions
+2. Learn state/context management in tools
+3. Study **Agents** module
+4. Implement agent-based systems
+
+**Path B: State & Memory Management**
+1. Study **Tools** module (examples 4-6)
+   - State access via ToolRuntime
+   - Context-aware tools
+   - Long-term memory (Store)
+2. Combine with Agents for stateful systems
 
 ### Expert
 1. Explore **Frontend** module
@@ -365,13 +537,17 @@ OLLAMA_HOST=0.0.0.0:11435 ollama serve
 3. Implement advanced patterns
 4. Deploy to production
 
+---
+
 ## 🎓 LangChain Documentation References
 
 - [LangChain Official Docs](https://docs.langchain.com)
 - [Messages Guide](https://docs.langchain.com/oss/python/langchain/messages)
 - [Chat Models](https://docs.langchain.com/oss/python/langchain/models)
-- [Tool Calling](https://docs.langchain.com/oss/python/langchain/frontend/tool-calling)
+- [Tools Documentation](https://docs.langchain.com/oss/python/langchain/tools)
+- [Tool Calling Guide](https://docs.langchain.com/oss/python/langchain/models#tool-calling)
 - [Agents Framework](https://docs.langchain.com/oss/python/langgraph/agents)
+- [State Management](https://docs.langchain.com/oss/python/langgraph/graph-api)
 - [Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output)
 - [Ollama Integration](https://docs.langchain.com/oss/python/integrations/providers/ollama)
 
