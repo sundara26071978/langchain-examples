@@ -56,6 +56,15 @@ ollama pull gemma2:9b
 ollama pull llama2:13b
 ```
 
+#### 5. Configure Environment Variables
+Copy the example environment file and fill in the values you need:
+```bash
+copy .env.example .env
+# or on macOS/Linux:
+# cp .env.example .env
+```
+The template includes documented placeholders for the API keys and service settings used by the examples.
+
 ### Run Your First Example
 
 ```bash
